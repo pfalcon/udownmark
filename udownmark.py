@@ -38,61 +38,64 @@ class Markdown:
         self.block = ""
         self.typ = None
 
+    def render_line(self, l):
+        l_strip = l.rstrip()
+        #print(l_strip)
+
+        # Handle pre block content/end
+        if self.typ == "```" or self.typ == "~~~":
+            if l_strip == self.typ:
+                self.typ = None
+                self.out.write("</pre>\n")
+            else:
+                self.out.write(l)
+            return
+
+        # Handle pre block start
+        if l.startswith("```") or l.startswith("~~~"):
+            self.flush_block()
+            self.typ = l[0:3]
+            self.out.write("<pre>\n")
+            return
+
+        # Empty line ends current block
+        if not l_strip and self.block:
+            self.flush_block()
+            return
+
+        # Repeating empty lines are ignored - TODO
+        if not l_strip:
+            return
+
+        # Handle heading
+        if l.startswith("#"):
+            self.flush_block()
+            level = 0
+            while l.startswith("#"):
+                l = l[1:]
+                level += 1
+            l = l.strip()
+            self.out.write("<h%d>%s</h%d>\n" % (level, l, level))
+            return
+
+        if l.startswith("> "):
+            if self.typ != "bquote":
+                self.flush_block()
+            self.typ = "bquote"
+            l = l[2:]
+        elif l.startswith("* "):
+            self.flush_block()
+            self.typ = "list"
+            l = l[2:]
+
+        if not self.typ:
+            self.typ = "para"
+
+        self.block += l
+
     def render(self, lines):
         for l in lines:
-            l_strip = l.rstrip()
-            #print(l_strip)
-
-            # Handle pre block content/end
-            if self.typ == "```" or self.typ == "~~~":
-                if l_strip == self.typ:
-                    self.typ = None
-                    self.out.write("</pre>\n")
-                else:
-                    self.out.write(l)
-                continue
-
-            # Handle pre block start
-            if l.startswith("```") or l.startswith("~~~"):
-                self.flush_block()
-                self.typ = l[0:3]
-                self.out.write("<pre>\n")
-                continue
-
-            # Empty line ends current block
-            if not l_strip and self.block:
-                self.flush_block()
-                continue
-
-            # Repeating empty lines are ignored - TODO
-            if not l_strip:
-                continue
-
-            # Handle heading
-            if l.startswith("#"):
-                self.flush_block()
-                level = 0
-                while l.startswith("#"):
-                    l = l[1:]
-                    level += 1
-                l = l.strip()
-                self.out.write("<h%d>%s</h%d>\n" % (level, l, level))
-                continue
-
-            if l.startswith("> "):
-                if self.typ != "bquote":
-                    self.flush_block()
-                self.typ = "bquote"
-                l = l[2:]
-            elif l.startswith("* "):
-                self.flush_block()
-                self.typ = "list"
-                l = l[2:]
-
-            if not self.typ:
-                self.typ = "para"
-
-            self.block += l
+            self.render_line(l)
 
         # Render trailing block
         self.flush_block()
